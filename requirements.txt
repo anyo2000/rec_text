@@ -1,0 +1,5 @@
+openai>=1.0.0
+anthropic>=0.30.0
+watchdog>=4.0.0
+pydub>=0.25.1
+python-dotenv>=1.0.0
