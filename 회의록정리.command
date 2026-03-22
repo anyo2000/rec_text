@@ -1,5 +1,5 @@
 #!/bin/zsh
-cd "/Users/anyo/Desktop/workspace/rec_text-1"
+cd "/Users/anyo/Desktop/workspace/rec_text"
 echo "========================================="
 echo "  회의록 자동 정리 시작"
 echo "========================================="
