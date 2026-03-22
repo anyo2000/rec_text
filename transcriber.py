@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import threading
 import time
 import shutil
@@ -9,6 +11,25 @@ import config
 
 
 client = genai.Client(api_key=config.GEMINI_API_KEY)
+
+TRANSCRIBE_PROMPT = """\
+당신은 한국어 보험업계 회의/교육 음성을 전사하는 전문가입니다.
+
+## 지시사항
+1. 음성 파일의 전체 내용을 한국어로 빠짐없이 텍스트로 변환하세요.
+2. 서로 다른 화자를 구분하여 "화자1:", "화자2:" 등으로 표시하세요.
+   - 화자가 바뀔 때마다 새 줄에 화자 라벨을 붙이세요.
+   - 같은 화자가 계속 말하는 경우 라벨을 반복하지 마세요.
+3. 보험 용어(상품명, 특약명, 업계 용어 등)는 문맥을 고려하여 정확한 표현으로 전사하세요.
+4. 음성이 불명확하거나 목소리가 작은 부분은 전후 맥락을 고려하여 가장 적절한 내용으로 보정하세요.
+5. "어...", "음...", "그..." 같은 의미 없는 추임새는 제거하세요.
+6. 문장 부호를 적절히 넣되, 요약하지 말고 전체 내용을 그대로 옮기세요.
+
+## 출력 형식
+화자1: 말한 내용...
+화자2: 응답 내용...
+화자1: 이어지는 내용...
+"""
 
 
 def _progress_indicator(file_size_mb: float, stop_event: threading.Event):
@@ -24,7 +45,7 @@ def _progress_indicator(file_size_mb: float, stop_event: threading.Event):
 
 
 def transcribe(file_path: str | Path) -> str:
-    """Gemini API로 음성 파일을 텍스트로 변환"""
+    """Gemini API로 음성 파일을 텍스트로 변환 (화자 구분 + 용어 보정 포함)"""
     file_path = Path(file_path)
     if not file_path.exists():
         raise FileNotFoundError(f"파일을 찾을 수 없습니다: {file_path}")
@@ -53,14 +74,12 @@ def transcribe(file_path: str | Path) -> str:
             config={"mime_type": mime_type},
         )
 
-        # Gemini로 텍스트 변환
+        # Gemini로 텍스트 변환 (화자 구분 + 용어 보정)
         response = client.models.generate_content(
             model=config.GEMINI_MODEL,
             contents=[
                 uploaded_file,
-                "이 음성 파일의 내용을 한국어로 빠짐없이 텍스트로 변환해주세요. "
-                "말한 내용을 그대로 받아적되, 문장 부호를 적절히 넣어주세요. "
-                "요약하지 말고 전체 내용을 그대로 텍스트로 옮겨주세요."
+                TRANSCRIBE_PROMPT,
             ],
         )
 

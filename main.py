@@ -1,13 +1,23 @@
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
-# main.py가 있는 폴더를 기준으로 모듈 import
 sys.path.insert(0, str(Path(__file__).parent))
 
 import config
 from transcriber import transcribe
-from summarizer import summarize, format_original, save_result
+from summarizer import analyze, analyze_split, save_result
+from notion_uploader import upload_to_notion
+
+# MP3 128kbps 기준 1분 ≈ 0.94MB, 60분 ≈ 56MB
+ONE_HOUR_THRESHOLD_MB = 56
+
+
+def estimate_duration_min(file_path: Path) -> int:
+    """파일 크기로 대략적인 녹음 시간(분) 추정"""
+    size_mb = file_path.stat().st_size / (1024 * 1024)
+    return int(size_mb / 0.94)
 
 
 def process_file(file_path: Path):
@@ -15,33 +25,62 @@ def process_file(file_path: Path):
     file_path = Path(file_path)
     print(f"\n처리 시작: {file_path.name}")
 
-    # 1) 음성 → 텍스트
+    file_size_mb = file_path.stat().st_size / (1024 * 1024)
+    est_min = estimate_duration_min(file_path)
+    need_split = file_size_mb > ONE_HOUR_THRESHOLD_MB
+
+    # 음성 파일 생성 날짜 추출 (녹음 날짜)
+    file_stat = file_path.stat()
+    # macOS: st_birthtime(생성일), 없으면 st_mtime(수정일)
+    created_ts = getattr(file_stat, 'st_birthtime', file_stat.st_mtime)
+    recording_date = datetime.fromtimestamp(created_ts).strftime("%Y-%m-%d")
+
+    # 1) 음성 → 텍스트 (화자 구분 + 용어 보정 포함)
     print("  [1/3] 음성을 텍스트로 변환 중...")
     text = transcribe(file_path)
-    print(f"  변환 완료 (글자수: {len(text)})")
+    print(f"  변환 완료 (글자수: {len(text)}, 추정 {est_min}분)")
 
-    # 2) 텍스트 정리 (요약 + 핵심포인트)
-    print("  [2/4] 텍스트 정리 중 (GPT)...")
-    result = summarize(text)
-    print(f"  정리 완료 (주제: {result['subject']})")
+    # 2) 텍스트 분석
+    if need_split:
+        print(f"  [2/3] 1시간 초과 ({est_min}분) — 2개 파일로 분리 분석 중...")
+        results = analyze_split(text, est_min)
+        print(f"  정리 완료 ({len(results)}개 파트)")
+    else:
+        print("  [2/3] 텍스트 분석 및 정리 중...")
+        results = [analyze(text)]
+        print(f"  정리 완료 (주제: {results[0]['subject']})")
 
-    # 3) 원문 포맷팅 (단락/소제목 추가)
-    print("  [3/4] 원문 보기좋게 정리 중...")
-    result['formatted_original'] = format_original(text)
-    print("  원문 정리 완료")
+    # 3) 파일 저장 + 노션 업로드
+    print("  [3/3] 결과 저장 중...")
+    output_paths = []
+    for result in results:
+        output_path = save_result(result)
+        output_paths.append(output_path)
+        print(f"  텍스트 저장: {output_path}")
 
-    # 4) 파일 저장
-    print("  [4/4] 결과 저장 중...")
-    output_path = save_result(result)
-    print(f"  텍스트 저장: {output_path}")
+        # 노션 업로드
+        try:
+            notion_url = upload_to_notion(result, recording_date=recording_date)
+            if notion_url:
+                print(f"  노션 업로드 완료: {notion_url}")
+        except Exception as e:
+            print(f"  노션 업로드 실패: {e}")
 
-    # 5) 원본 음성파일도 output 폴더로 이동 (텍스트파일과 같은 이름)
-    audio_new_name = output_path.stem + file_path.suffix  # 예: 2026-02-15_상품교육.m4a
+    # 원본 음성파일을 output 폴더로 이동
+    first_output = output_paths[0]
+    # 분리된 경우 -1 빼고 기본 이름 사용
+    base_stem = first_output.stem.rsplit("-1", 1)[0] if need_split else first_output.stem
+    audio_new_name = base_stem + file_path.suffix
     dest = config.OUTPUT_DIR / audio_new_name
+    counter = 1
+    while dest.exists():
+        audio_new_name = f"{base_stem}_{counter}{file_path.suffix}"
+        dest = config.OUTPUT_DIR / audio_new_name
+        counter += 1
     shutil.move(str(file_path), str(dest))
     print(f"  원본 이동: {dest}")
 
-    return output_path
+    return output_paths
 
 
 def main():
@@ -59,7 +98,8 @@ def main():
 
     print(f"발견된 음성 파일: {len(audio_files)}개")
     for f in audio_files:
-        print(f"  - {f.name}")
+        est = estimate_duration_min(f)
+        print(f"  - {f.name} (약 {est}분)")
 
     print("\n변환을 시작합니다...")
 

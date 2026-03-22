@@ -5,16 +5,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
-INPUT_DIR = BASE_DIR / "input"
-OUTPUT_DIR = INPUT_DIR / "output"
+ICLOUD_DIR = Path.home() / "Library" / "Mobile Documents" / "com~apple~CloudDocs"
+INPUT_DIR = ICLOUD_DIR / "회의록 "
+OUTPUT_DIR = BASE_DIR / "output"
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+NOTION_API_TOKEN = os.getenv("NOTION_API_TOKEN")
+NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
 
-AUDIO_EXTENSIONS = {".m4a", ".mp3", ".wav", ".ogg", ".webm", ".flac", ".mp4", ".mpeg", ".mpga"}
+AUDIO_EXTENSIONS = {".m4a", ".mp3", ".wav", ".ogg", ".webm", ".flac", ".mp4", ".mpeg", ".mpga", ".aac"}
 
 GEMINI_MODEL = "gemini-2.5-flash"
-GPT_MODEL = "gpt-4o"
 
 for d in [INPUT_DIR, OUTPUT_DIR]:
     d.mkdir(exist_ok=True)
