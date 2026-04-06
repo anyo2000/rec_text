@@ -1,6 +1,6 @@
 #!/bin/zsh
-cd "/Users/anyo/Desktop/workspace/rec_text"
+cd "$HOME/Desktop/workspace/rec_text"
 echo "========================================="
 echo "  회의록 자동 정리 시작"
 echo "========================================="
-python3 main.py
+./venv/bin/python3 main.py

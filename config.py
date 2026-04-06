@@ -6,7 +6,7 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 ICLOUD_DIR = Path.home() / "Library" / "Mobile Documents" / "com~apple~CloudDocs"
-INPUT_DIR = ICLOUD_DIR / "회의록 "
+INPUT_DIR = Path.home() / "Library" / "Mobile Documents" / "NK37SPV8GQ~cn~winat~EasyVoice" / "Documents"
 OUTPUT_DIR = BASE_DIR / "output"
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

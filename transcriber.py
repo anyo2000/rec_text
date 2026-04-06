@@ -69,6 +69,9 @@ def transcribe(file_path: str | Path) -> str:
     try:
         # 파일 업로드
         mime_type = mimetypes.guess_type(str(temp_file))[0] or "audio/mp4"
+        # Gemini API는 audio/aac를 기대하지만 Python은 audio/x-aac를 반환함
+        if mime_type == "audio/x-aac":
+            mime_type = "audio/aac"
         uploaded_file = client.files.upload(
             file=temp_file,
             config={"mime_type": mime_type},
